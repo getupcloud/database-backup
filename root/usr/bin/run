@@ -11,11 +11,10 @@ mongodb_user=${MONGODB_USER}
 mongodb_password=${MONGODB_PASSWORD}
 mongodb_database=${MONGODB_DATABASE}
 azure_key=${AZURE_KEY}
-blob_endpoint=${BLOB_ENDPOINT:-https://getupbackup.blob.core.windows.net/}
 azure_name=${AZURE_NAME:-getupbackup}
 TIMESTAMP=$(date +%Y-%m-%d-%H%M%S)
-AZURE_BLOB_NAME="${NAMESPACE}/${POD}-${TIMESTAMP}"
-AZURE_CONTAINER=${CONTAINER:-backups}
+azure_blob_name="${NAMESPACE}/${POD}-${TIMESTAMP}"
+azure_container=${AZURE_CONTAINER:-backups}
 BACKUP_DIR=/data
 
 if [ "$ENGINE" = 'mysql' ]; then
@@ -39,11 +38,11 @@ if [ -f "$BACKUP_FILE" ]; then
 
   azure config mode arm
   azure storage blob upload \
-    --account-name $AZURE_NAME \
-    --account-key $AZURE_KEY \
-    --container $AZURE_CONTAINER \
+    --account-name $azure_name \
+    --account-key $azure_key \
+    --container $azure_container \
     --file $BACKUP_FILE \
-    --blob ${AZURE_BLOB_NAME}.${FORMAT}
+    --blob ${azure_blob_name}.${FORMAT}
 
   rm -rf $BACKUP_FILE
 fi
