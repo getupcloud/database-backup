@@ -1,48 +1,66 @@
 #!/bin/bash
-set -ex
 
-db_host=${DB_HOST}
-mysql_user=${MYSQL_USER}
-mysql_password=${MYSQL_PASSWORD}
-postgresql_user=${POSTGRESQL_USER}
-postgresql_password=${POSTGRESQL_PASSWORD}
-postgresql_host=${POSTGRESQL_HOST}
-mongodb_user=${MONGODB_USER}
-mongodb_password=${MONGODB_PASSWORD}
-mongodb_database=${MONGODB_DATABASE}
 azure_key=${AZURE_KEY}
 azure_name=${AZURE_NAME:-getupbackup}
 TIMESTAMP=$(date +%Y-%m-%d-%H%M%S)
-azure_blob_name="${NAMESPACE}/${POD}-${TIMESTAMP}"
 azure_container=${AZURE_CONTAINER:-backups}
 BACKUP_DIR=/data
+BACKUP_FILE=${BACKUP_DIR}/backup-${TIMESTAMP}
 
-if [ "$ENGINE" = 'mysql' ]; then
-  FORMAT='sql.gz'
-  BACKUP_FILE=${BACKUP_DIR}/backup-${TIMESTAMP}.gz
-  mysqldump -h $db_host -u $mysql_user -p$mysql_password --all-databases | gzip > $BACKUP_FILE
 
-elif [ "$ENGINE" = 'postgresql' ]; then
-  FORMAT='sql.gz'
-  BACKUP_FILE=${BACKUP_DIR}/backup-${TIMESTAMP}.gz
-  PGPASSWORD="${postgresql_password}" pg_dump -x -h $db_host -U $postgresql_user --no-password -d $POSTGRESQL_DATABASE | gzip > $BACKUP_FILE
+# only needed for writing a kubeconfig:
+master_url=${MASTER_URL:-https://kubernetes.default.svc.cluster.local:443}
+master_ca=${MASTER_CA:-/var/run/secrets/kubernetes.io/serviceaccount/ca.crt}
+token_file=${TOKEN_FILE:-/var/run/secrets/kubernetes.io/serviceaccount/token}
+NAMESPACE=${NAMESPACE:-default}
 
-elif [ "$ENGINE" = 'mongodb' ]; then
-  FORMAT='bson.tar.gz'
-  BACKUP_FILE=${BACKUP_DIR}/backup-${TIMESTAMP}.tar.gz
-  mongodump -h $db_host -u $mongodb_user -p $mongodb_password --db $mongodb_database --out ${BACKUP_DIR}/dump
-  tar cfz $BACKUP_FILE ${BACKUP_DIR}/dump
-fi 
 
-if [ -f "$BACKUP_FILE" ]; then
+# set up configuration for openshift client and azure
+if [ -n "${WRITE_KUBECONFIG}" ]; then
+    # craft a kubeconfig, usually at $KUBECONFIG location
+    oc config set-cluster master \
+  --api-version='v1' \
+  --certificate-authority="${master_ca}" \
+  --server="${master_url}"
+    oc config set-credentials account \
+  --token="$(cat ${token_file})"
+    oc config set-context current \
+  --cluster=master \
+  --user=account \
+  --namespace="${NAMESPACE}"
+    oc config use-context current
 
+  azure telemetry --disable
   azure config mode arm
-  azure storage blob upload \
-    --account-name $azure_name \
-    --account-key $azure_key \
-    --container $azure_container \
-    --file $BACKUP_FILE \
-    --blob ${azure_blob_name}.${FORMAT}
-
-  rm -rf $BACKUP_FILE
 fi
+
+
+dcs=$(oc get dc -o jsonpath --template='{.items[*].metadata.name}' -n ${NAMESPACE})
+
+set -x
+for dc in $dcs; do
+  oc rsh -t -n ${NAMESPACE} dc/${dc} > ${BACKUP_FILE} <<EOF
+[ -n "\${ENABLED_COLLECTIONS}" ] && source scl_source enable \${ENABLED_COLLECTIONS}
+[ -d /var/lib/mysql ] && exec mysqldump -u root --all-databases
+[ -d /var/lib/pgsql ] && exec pg_dumpall
+[ -d /var/lib/mongodb ] && exec mongodump --username admin --password \${MONGODB_ADMIN_PASSWORD} --archive
+exit 1
+EOF
+
+  if [ $? -eq 0 ]; then
+    
+    if [ -f ${BACKUP_FILE} ]; then
+      gzip ${BACKUP_FILE}
+    fi
+
+    azure_blob_name="${NAMESPACE}/${dc}-${TIMESTAMP}.gz"
+
+    azure storage blob upload \
+        --account-name $azure_name \
+        --account-key $azure_key \
+        --container $azure_container \
+        --file ${BACKUP_FILE}.gz \
+        --blob ${azure_blob_name}
+      rm -f ${BACKUP_FILE}.gz
+  fi
+done

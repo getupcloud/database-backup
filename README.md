@@ -13,10 +13,12 @@ MySQL versions currently supported are:
 PostgreSQL versions currently supported are:
 * [postgresql-9.2](http://www.postgresql.org/docs/9.2/static/index.html)
 * [postgresql-9.4](http://www.postgresql.org/docs/9.4/static/index.html)
+* [postgresql-9.5](http://www.postgresql.org/docs/9.5/static/index.html)
 
 MongoDB versions currently supported are:
 * [mongodb-2.4](https://docs.mongodb.org/v2.4/)
 * [mongodb-2.6](https://docs.mongodb.org/v2.6/)
+* [mongodb-2.6](https://docs.mongodb.org/v3.2/)
 
 ##Instalation:
 You can either use our image from [dockerhub](https://hub.docker.com/r/getupcloud/backup) or build at your local machine:
@@ -40,22 +42,7 @@ This image expects you have a Azure Storage Account, a blob container and the ke
 
 ##Usage:
 
-For MySQL Database pods:
+  ```
+  $ ./backup.sh -n NAMESPACE -k <Azure Key> -c <Azure Container> -a <Azure Storage Account Name>
 
   ```
-  $ ./backup.sh -e mysql -k <Azure Key> -c <Azure Container> -a <Azure Storage Account Name>
-
-  ```
-
-For PostgreSQL Database pods:
-
-  ```
-  $ ./backup.sh -e postgresql -k <Azure Key> -c <Azure Container> -a <Azure Storage Account Name>
-  ```
-
-For MongoDB Database pods:
-
-  ```
-  $ ./backup.sh -e mongodb -k <Azure Key> -c <Azure Container> -a <Azure Storage Account Name>
-  ```
-
