@@ -18,7 +18,7 @@ EOF
 backup() {
 
   if [ $# -eq 1 ]; then
-    oc create -f - -n default <<EOF
+    oc create -f - <<EOF
     #cat <<EOF
 apiVersion: v1
 kind: Pod
