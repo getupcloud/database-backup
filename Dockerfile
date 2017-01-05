@@ -15,12 +15,7 @@ RUN mkdir -p ${HOME} && chmod 777 ${HOME}
 
 ADD root /
 
-ENV CONTAINER_SCRIPTS_PATH=/usr/share/container-scripts \
-#ENABLED_COLLECTIONS=""
-
-#ENV BASH_ENV=${CONTAINER_SCRIPTS_PATH}/scl_enable \
-#    ENV=${CONTAINER_SCRIPTS_PATH}/scl_enable \
-#    PROMPT_COMMAND=". ${CONTAINER_SCRIPTS_PATH}/scl_enable"
+ENV CONTAINER_SCRIPTS_PATH=/usr/share/container-scripts
 
 VOLUME ${HOME}
 
