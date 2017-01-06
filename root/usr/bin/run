@@ -7,9 +7,9 @@ azure_container=${AZURE_CONTAINER:-backups}
 BACKUP_DIR=/data
 BACKUP_FILE=${BACKUP_DIR}/backup-${TIMESTAMP}
 location=${LOCATION}
-export aws_s3_key=${AWS_S3_KEY}
-export aws_s3_secret=${AWS_S3_SECRET}
-export aws_s3_region=${AWS_S3_REGION}
+export AWS_ACCESS_KEY_ID==${AWS_S3_KEY}
+export AWS_SECRET_ACCESS_KEY=${AWS_S3_SECRET}
+export AWS_DEFAULT_REGION=${AWS_S3_REGION}
 export aws_s3_bucket=${AWS_S3_BUCKET}
 
 
@@ -59,7 +59,7 @@ EOF
     fi
 
     if [ $location == "AWS" ]; then
-      aws s3 cp ${BACKUP_FILE}.gz s3://$AWS_S3_BUCKET/
+      aws s3 cp ${BACKUP_FILE}.gz s3://$aws_s3_bucket/
       rm -f ${BACKUP_FILE}.gz
 
     else
