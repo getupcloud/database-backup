@@ -9,16 +9,20 @@ ENV HOME=/data \
 
 RUN mkdir -p ${HOME} && \
     chmod 777 ${HOME} && \
-    INSTALL_PKGS="nodejs npm telnet" && \
+    INSTALL_PKGS="nodejs npm telnet python2-pip" && \
     yum install -y epel-release && \
     yum install -y --setopt=tsflags=nodocs $INSTALL_PKGS && \
     yum clean all -y && \
     npm install -g azure-cli && \
-    npm cache clean
+    npm cache clean && \
+    azure telemetry --disable && \
+    azure config mode arm && \
+    pip install awscli && \
+    chmod 777 ${HOME} -R
 
 ADD root /
 
-VOLUME ${HOME}
+#VOLUME ${HOME}
 
 USER 1000
 

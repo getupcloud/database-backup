@@ -1,66 +1,142 @@
 #!/bin/bash
 
-azure_key=${AZURE_KEY}
-azure_name=${AZURE_NAME:-getupbackup}
+send_to_azure()
+{
+   [ -n "${AZURE_ACCOUNT_KEY}" ] && \
+   [ -n "${AZURE_ACCOUNT_NAME}" ] && \
+   [ -n "${AZURE_CONTAINER}" ]
+}
+
+
+send_to_aws()
+{
+   [ -n "${AWS_ACCESS_KEY_ID}" ] && \
+   [ -n "${AWS_SECRET_ACCESS_KEY}" ] && \
+   [ -n "${AWS_S3_BUCKET_NAME}" ] && \
+   [ -n "${AWS_REGION}" ]
+}
+
+
+azure_upload()
+{
+    echo "--> Uploading to Azure Blob Storage: ${AZURE_CONTAINER}/${2}"
+    azure storage blob upload \
+        --account-key "${AZURE_ACCOUNT_KEY}" \
+        --account-name "${AZURE_ACCOUNT_NAME}" \
+        --container "${AZURE_CONTAINER}" \
+        --file "${1}" \
+        --blob "${2}"
+}
+
+aws_upload()
+{
+    echo "--> Uploading to S3: s3://$AWS_S3_BUCKET_NAME/$2"
+    aws s3 cp \
+        ${AWS_REGION:+--region "${AWS_REGION}"} \
+        "${1}" \
+        "s3://${AWS_S3_BUCKET_NAME}/"
+}
+
+upload()
+{
+    local local_file=${1}
+    local app_name=${2}
+    local basename=${local_file##*/}
+    local remote_path="${NAMESPACE}/${app_name}/${basename}"
+
+    send_to_azure && azure_upload "${local_file}" "${remote_path}"
+    send_to_aws && aws_upload "${local_file}" "${remote_path}"
+}
+
+
+send_to_azure && is_azure=1 || is_azure=0
+send_to_aws && is_aws=1 || is_aws=0
+
+if [ $(( $is_azure | $is_aws )) -eq 0 ]; then
+    cat <<-EOF
+	ERROR: Please select at least one storage method by settings according env vars:
+	ERROR:
+	ERROR:  - Azure Blob Storage
+	ERROR:      AZURE_ACCOUNT_NAME
+	ERROR:      AZURE_ACCOUNT_KEY
+	ERROR:      AZURE_CONTAINER
+	ERROR:
+	ERROR:  - AWS S3
+	ERROR:      AWS_ACCESS_KEY_ID
+	ERROR:      AWS_SECRET_ACCESS_KEY
+	ERROR:      AWS_S3_BUCKET_NAME
+	ERROR:      AWS_REGION or AWS_DEFAULT_REGION (optional)
+	EOF
+    missconfig=1
+fi
+
+if [ -z "${NAMESPACE}" ]; then
+    echo "ERROR: Missing env var NAMESPACE"
+    missconfig=1
+fi
+
+[ "${missconfig}" == "1" ] && exit 1
+[ "${DEBUG}" == 1 ] && set -x
+
+# TODO: move to image
+#if send_to_azure; then
+#    azure telemetry --disable
+#    azure config mode arm
+#fi
+
 TIMESTAMP=$(date +%Y-%m-%d-%H%M%S)
-azure_container=${AZURE_CONTAINER:-backups}
-BACKUP_DIR=/data
-BACKUP_FILE=${BACKUP_DIR}/backup-${TIMESTAMP}
-
-
-# only needed for writing a kubeconfig:
-master_url=${MASTER_URL:-https://kubernetes.default.svc.cluster.local:443}
-master_ca=${MASTER_CA:-/var/run/secrets/kubernetes.io/serviceaccount/ca.crt}
-token_file=${TOKEN_FILE:-/var/run/secrets/kubernetes.io/serviceaccount/token}
-NAMESPACE=${NAMESPACE:-default}
-
+DUMP_FILE=${HOME:-/data}/backup-${TIMESTAMP}
 
 # set up configuration for openshift client and azure
 if [ -n "${WRITE_KUBECONFIG}" ]; then
+    MASTER_URL=${MASTER_URL:-https://kubernetes.default.svc.cluster.local:443}
+    MASTER_CA=${MASTER_CA:-/var/run/secrets/kubernetes.io/serviceaccount/ca.crt}
+    TOKEN_FILE=${TOKEN_FILE:-/var/run/secrets/kubernetes.io/serviceaccount/token}
+
     # craft a kubeconfig, usually at $KUBECONFIG location
     oc config set-cluster master \
-  --api-version='v1' \
-  --certificate-authority="${master_ca}" \
-  --server="${master_url}"
-    oc config set-credentials account \
-  --token="$(cat ${token_file})"
-    oc config set-context current \
-  --cluster=master \
-  --user=account \
-  --namespace="${NAMESPACE}"
-    oc config use-context current
+        --api-version='v1' \
+        --certificate-authority="${MASTER_CA}" \
+        --server="${MASTER_URL}"
 
-  azure telemetry --disable
-  azure config mode arm
+    oc config set-credentials account \
+        --token="$(<${TOKEN_FILE})"
+
+    oc config set-context current \
+        --cluster=master \
+        --user=account \
+        --namespace="${NAMESPACE}"
+
+    oc config use-context current
 fi
 
+dcs=$(oc get dc -o jsonpath \
+    --template='{.items[*].metadata.name}' \
+    -n ${NAMESPACE} \
+    ${LABEL_SELECTOR:+-l ${LABEL_SELECTOR}}
+)
 
-dcs=$(oc get dc -o jsonpath --template='{.items[*].metadata.name}' -n ${NAMESPACE} ${LABEL_SELECTOR:+-l ${LABEL_SELECTOR}})
+if [ -z "${dcs}" ]; then
+    echo "No suitable applications to dump from '${NAMESPACE}'. Giving up..."
+    exit 0
+fi
 
-set -x
-for dc in $dcs; do
-  oc rsh -t -n ${NAMESPACE} dc/${dc} > ${BACKUP_FILE} <<EOF
-[ -n "\${ENABLED_COLLECTIONS}" ] && source scl_source enable \${ENABLED_COLLECTIONS}
-[ -d /var/lib/mysql ] && exec mysqldump -u root --all-databases
-[ -d /var/lib/pgsql ] && exec pg_dumpall
-[ -d /var/lib/mongodb ] && exec mongodump --username admin --password \${MONGODB_ADMIN_PASSWORD} --archive
-exit 1
-EOF
+for dc in ${dcs}; do
+    rm -f ${DUMP_FILE}
+	## Start lines with TAB to here-doc strip it prior expansion
+	oc rsh -t -n ${NAMESPACE} dc/${dc} > ${DUMP_FILE} <<-EOF
+		[ -n "\${ENABLED_COLLECTIONS}" ] && source scl_source enable \${ENABLED_COLLECTIONS}
+		[ -d /var/lib/mysql ] && exec mysqldump -u root --all-databases
+		[ -d /var/lib/pgsql ] && exec pg_dumpall
+		[ -d /var/lib/mongodb ] && exec mongodump --username admin --password \${MONGODB_ADMIN_PASSWORD} --archive
+		exit 1
+	EOF
 
-  if [ $? -eq 0 ]; then
-    
-    if [ -f ${BACKUP_FILE} ]; then
-      gzip ${BACKUP_FILE}
+    if [ $? -eq 0 ]; then
+        if [ -s ${DUMP_FILE} ]; then
+            gzip "${DUMP_FILE}"
+            upload ${DUMP_FILE}.gz ${dc}
+            rm -f ${DUMP_FILE}.gz
+        fi
     fi
-
-    azure_blob_name="${NAMESPACE}/${dc}-${TIMESTAMP}.gz"
-
-    azure storage blob upload \
-        --account-name $azure_name \
-        --account-key $azure_key \
-        --container $azure_container \
-        --file ${BACKUP_FILE}.gz \
-        --blob ${azure_blob_name}
-      rm -f ${BACKUP_FILE}.gz
-  fi
 done
