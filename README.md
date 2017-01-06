@@ -40,9 +40,15 @@ To build the image:
 This image expects you have a Azure Storage Account, a blob container and the keys, for more information about Azure Blob Storage please see the official [documentation](https://azure.microsoft.com/en-us/documentation/articles/storage-create-storage-account/)
 
 
-##Usage:
+##Azure Usage:
 
   ```
-  $ ./backup.sh -n NAMESPACE -k <Azure Key> -c <Azure Container> -a <Azure Storage Account Name>
+  $ ./backup.sh -n NAMESPACE -l <AZURE> -k <Azure Key> -c <Azure Container> -a <Azure Storage Account Name>
+
+  ```
+
+##AWS S3 Usage:
+  ```
+  $ ./backup.sh -n NAMESPACE -l <AWS> -w <Aws Access Key> -s <Aws Secret Key> -r <Aws Default Region> -b <S3 Bucket Name>
 
   ```
