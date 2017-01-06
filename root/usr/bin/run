@@ -7,10 +7,10 @@ azure_container=${AZURE_CONTAINER:-backups}
 BACKUP_DIR=/data
 BACKUP_FILE=${BACKUP_DIR}/backup-${TIMESTAMP}
 location=${LOCATION}
-aws_s3_key=${AWS_S3_KEY}
-aws_s3_secret=${AWS_S3_SECRET}
-aws_s3_region=${AWS_S3_REGION}
-aws_s3_bucket=${AWS_S3_BUCKET}
+export aws_s3_key=${AWS_S3_KEY}
+export aws_s3_secret=${AWS_S3_SECRET}
+export aws_s3_region=${AWS_S3_REGION}
+export aws_s3_bucket=${AWS_S3_BUCKET}
 
 
 # only needed for writing a kubeconfig:
