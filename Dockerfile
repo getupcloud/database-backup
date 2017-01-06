@@ -26,4 +26,4 @@ VOLUME ${HOME}
 USER 1000
 
 ENTRYPOINT ["container-entrypoint"]
-CMD ["run"]
+CMD ["run_aws"]
