@@ -59,6 +59,7 @@ EOF
     fi
 
     if [ $location == "AWS" ]; then
+      echo "credenciais - $AWS_ACCESS_KEY_ID  - $AWS_SECRET_ACCESS_KEY  - $AWS_DEFAULT_REGION "
       aws s3 cp ${BACKUP_FILE}.gz s3://$aws_s3_bucket/
       rm -f ${BACKUP_FILE}.gz
 
