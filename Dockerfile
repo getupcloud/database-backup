@@ -16,6 +16,9 @@ RUN mkdir -p ${HOME} && \
     npm install -g azure-cli && \
     npm cache clean
 
+#Install AWSCLI
+RUN cd /tmp && curl -O https://bootstrap.pypa.io/get-pip.py && python get-pip.py && pip install awscli
+
 ADD root /
 
 VOLUME ${HOME}
