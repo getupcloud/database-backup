@@ -57,10 +57,7 @@ spec:
       - name: AWS_S3_BUCKET
         value: ${AWS_S3_BUCKET}
   dnsPolicy: ClusterFirst
-  nodeSelector:
-    role: infra
   restartPolicy: Never
-  serviceAccount: image-pruner
   volumes:
   - name: empty
     emptyDir: {}
@@ -117,26 +114,15 @@ do
   esac
 done
 
-
-if [ -z "$ENGINE" ]; then
-    echo "ERROR: I need a engine do backup!. See --help"
-    exit 1
-fi
-
 if [ -z "$LOCATION" ]; then
     echo "ERROR: I need a location to store your backup! See --help"
     exit 1
 fi
 
-if [ "$LOCATION" != "AWS" -o "$LOCATION" != "AZURE" ]; then
-    echo "ERROR: Case sensitive, you must inform AWS or AZURE . See --help"
-    exit 1
-fi
-
-if [ -z "$AZURE_KEY" -o -z "$AZURE_CONTAINER" -o -z "$AZURE_NAME" ]; then
-    echo "ERROR: I need the azure credentials! See --help"
-    exit 1
-fi
+#if [ -z "$AZURE_KEY" -o -z "$AZURE_CONTAINER" -o -z "$AZURE_NAME" ]; then
+#    echo "ERROR: I need the azure credentials! See --help"
+#    exit 1
+#fi
 
 if [ -z "$AWS_S3_KEY" -o -z "$AWS_S3_SECRET" -o -z "$AWS_S3_REGION" -o -z "$AWS_S3_BUCKET" ]; then
     echo "ERROR: I need the AWS credentials! See --help"
