@@ -33,7 +33,7 @@ metadata:
     role: backup
 spec:
   containers:
-  - image: getupcloud/backup:v2
+  - image: juniorjbn/backup:wip-joao
     imagePullPolicy: Always
     name: backup
     volumeMounts:
