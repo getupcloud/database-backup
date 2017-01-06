@@ -57,7 +57,8 @@ spec:
       - name: AWS_S3_BUCKET
         value: ${AWS_S3_BUCKET}
   dnsPolicy: ClusterFirst
-  restartPolicy: Never
+  nodeSelector:
+  serviceAccount: gerabackup
   volumes:
   - name: empty
     emptyDir: {}

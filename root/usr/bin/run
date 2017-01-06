@@ -59,9 +59,8 @@ EOF
     fi
 
     if [ $location == "AWS" ]; then
-      file_name="${dc}-${TIMESTAMP}.gz"
-      aws s3 cp $file_name s3://$AWS_S3_BUCKET/
-      rm -f $file_name
+      aws s3 cp ${BACKUP_FILE}.gz s3://$AWS_S3_BUCKET/
+      rm -f ${BACKUP_FILE}.gz
 
     else
       azure_blob_name="${NAMESPACE}/${dc}-${TIMESTAMP}.gz"
