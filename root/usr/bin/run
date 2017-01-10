@@ -36,7 +36,7 @@ aws_upload()
     aws s3 cp \
         ${AWS_REGION:+--region "${AWS_REGION}"} \
         "${1}" \
-        "s3://${AWS_S3_BUCKET_NAME}/"
+        "s3://${AWS_S3_BUCKET_NAME}/${2}"
 }
 
 upload()
