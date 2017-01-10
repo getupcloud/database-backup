@@ -19,6 +19,7 @@ send_to_aws()
 
 azure_upload()
 {
+    echo
     echo "--> Uploading to Azure Blob Storage: ${AZURE_CONTAINER}/${2}"
     azure storage blob upload \
         --account-key "${AZURE_ACCOUNT_KEY}" \
@@ -30,6 +31,7 @@ azure_upload()
 
 aws_upload()
 {
+    echo
     echo "--> Uploading to S3: s3://$AWS_S3_BUCKET_NAME/$2"
     aws s3 cp \
         ${AWS_REGION:+--region "${AWS_REGION}"} \
@@ -123,6 +125,10 @@ fi
 
 for dc in ${dcs}; do
     rm -f ${DUMP_FILE}
+
+    echo
+    echo "--> Dumping from ${dc}"
+
 	## Start lines with TAB to here-doc strip it prior expansion
 	oc rsh -t -n ${NAMESPACE} dc/${dc} > ${DUMP_FILE} <<-EOF
 		[ -n "\${ENABLED_COLLECTIONS}" ] && source scl_source enable \${ENABLED_COLLECTIONS}
