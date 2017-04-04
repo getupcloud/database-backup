@@ -44,7 +44,7 @@ upload()
     local local_file=${1}
     local app_name=${2}
     local basename=${local_file##*/}
-    local remote_path="${NAMESPACE}/${app_name}/${basename}"
+    local remote_path="${NAMESPACE}/${NAMESPACE_UID}/${app_name}/${basename}"
 
     send_to_azure && azure_upload "${local_file}" "${remote_path}"
     send_to_aws && aws_upload "${local_file}" "${remote_path}"
@@ -76,6 +76,8 @@ if [ -z "${NAMESPACE}" ]; then
     echo "ERROR: Missing env var NAMESPACE"
     missconfig=1
 fi
+
+export NAMESPACE_UID=`oc get namespaces/uber -o jsonpath --template='{.metadata.uid}'`
 
 [ "${missconfig}" == "1" ] && exit 1
 [ "${DEBUG}" == 1 ] && set -x
