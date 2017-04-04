@@ -114,25 +114,44 @@ if [ -n "${WRITE_KUBECONFIG}" ]; then
     oc config use-context current
 fi
 
+resources=()
+
 dcs=$(oc get dc -o jsonpath \
     --template='{.items[*].metadata.name}' \
     -n ${NAMESPACE} \
     ${LABEL_SELECTOR:+-l ${LABEL_SELECTOR}}
 )
 
-if [ -z "${dcs}" ]; then
+for dc in ${dcs}; do
+    i=${#resources[*]}
+    resources[$i]=deploymentconfig/$dc
+done
+
+petsets=$(oc get petset -o jsonpath \
+    --template='{.items[*].metadata.name}' \
+    -n ${NAMESPACE} \
+    ${LABEL_SELECTOR:+-l ${LABEL_SELECTOR}}
+)
+
+for ps in ${petsets}; do
+    i=${#resources[*]}
+    resources[$i]=pod/${ps}-0
+done
+
+if [ ${resources[*]} -lt 1 ]; then
     echo "No suitable applications to dump from '${NAMESPACE}'. Giving up..."
     exit 0
 fi
 
-for dc in ${dcs}; do
-    rm -f ${DUMP_FILE}
+
+for res in ${resources[*]}; do
+    rm -vf ${DUMP_FILE} || true
 
     echo
-    echo "--> Dumping from ${dc}"
+    echo "--> Dumping from ${res}"
 
 	## Start lines with TAB to here-doc strip it prior expansion
-	oc rsh -t -n ${NAMESPACE} dc/${dc} > ${DUMP_FILE} <<-EOF
+	oc rsh -t -n ${NAMESPACE} ${res} > ${DUMP_FILE} <<-EOF
 		[ -n "\${ENABLED_COLLECTIONS}" ] && source scl_source enable \${ENABLED_COLLECTIONS}
 		[ -d /var/lib/mysql ] && exec mysqldump -u root --all-databases
 		[ -d /var/lib/pgsql ] && exec pg_dumpall
