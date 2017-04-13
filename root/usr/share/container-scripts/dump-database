@@ -6,8 +6,9 @@
 
 if [ -d /var/lib/mysql ]; then
     mysqldump -u root -S /var/lib/mysql/mysql.sock --all-databases || \
-    mysqldump -u root "-p$MYSQL_ROOT_PASSWORD"  -h mysql-16-gtcer --all-databases || \
-    mysqldump -u root "-p${MYSQL_ROOT_PASSWORD}" --all-databases
+    mysqldump -u root "-p${MYSQL_ROOT_PASSWORD:-.}" -h $HOSTNAME --all-databases || \
+    mysqldump -u root "-p${MYSQL_ROOT_PASSWORD:-.}" --all-databases || \
+    mysqldump -u ${MYSQL_USER} "-p${MYSQL_PASSWORD:-.}" -h ${HOSTNAME} ${MYSQL_DATABASE}
     exit $?
 fi
 
