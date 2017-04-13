@@ -21,7 +21,7 @@ if [ -d /var/lib/mongodb ]; then
         cd ${dir}
         mongodump --username admin --password "${MONGODB_ADMIN_PASSWORD}"
         tar cf - dump/
-        local ret=$?
+        ret=$?
         rm -rf ./dump &>/dev/null
         exit $ret
     elif mongo --version | grep '3\.[0-9]'; then
