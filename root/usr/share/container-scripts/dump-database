@@ -1,0 +1,26 @@
+#!/bin/bash
+
+#[ "${DEBUG}" == 1 ] && set -x
+
+[ -n "${ENABLED_COLLECTIONS}" ] && source scl_source enable ${ENABLED_COLLECTIONS}
+
+if [ -d /var/lib/mysql ]; then
+    mysqldump -u root -S /var/lib/mysql/mysql.sock --all-databases || \
+    mysqldump -u root "-p$MYSQL_ROOT_PASSWORD"  -h mysql-16-gtcer --all-databases || \
+    mysqldump -u root "-p${MYSQL_ROOT_PASSWORD}" --all-databases
+    exit $?
+fi
+
+[ -d /var/lib/pgsql ] && exec pg_dumpall
+
+if [ -d /var/lib/mongodb ]; then
+    if mongo --version | grep '2\.[0-9]'; then
+        dir=`mktemp -d`
+        trap "rm -rf '${dir}'" EXIT
+        cd ${dir}
+        mongodump --username admin --password "${MONGODB_ADMIN_PASSWORD}"
+        tar cf - dump/
+    elif mongo --version | grep '3\.[0-9]'; then
+        exec mongodump --username admin --password "${MONGODB_ADMIN_PASSWORD}" --archive
+    fi
+fi
