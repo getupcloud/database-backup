@@ -48,7 +48,7 @@ upload()
     local local_file=${1}
     local app_name=${2}
     local basename=${local_file##*/}
-    local remote_path="${NAMESPACE}/${NAMESPACE_UID}/${app_name}/${basename}"
+    local remote_path="${NAMESPACE}/${NAMESPACE_UID}/${app_name}_${basename}"
 
     send_to_azure && azure_upload "${local_file}" "${remote_path}"
     send_to_aws && aws_upload "${local_file}" "${remote_path}"
@@ -80,37 +80,34 @@ if [ -z "${NAMESPACE}" ]; then
     missconfig=1
 fi
 
-export NAMESPACE_UID=`oc get namespaces/uber -o jsonpath --template='{.metadata.uid}'`
-
-[ "${missconfig}" == "1" ] && exit 1
+[ "${missconfig}" == 1 ] && exit 1
 [ "${DEBUG}" == 1 ] && set -x
+unset DEBUG
 
+DUMP_FILE=${HOME:-/data}/${TIMESTAMP}
 
-TIMESTAMP=$(date +%Y-%m-%d-%H%M%S)
-DUMP_FILE=${HOME:-/data}/backup-${TIMESTAMP}
+# set up configuration for openshift client
+MASTER_URL=${MASTER_URL:-https://kubernetes.default.svc.cluster.local:443}
+MASTER_CA=${MASTER_CA:-/var/run/secrets/kubernetes.io/serviceaccount/ca.crt}
+TOKEN_FILE=${TOKEN_FILE:-/var/run/secrets/kubernetes.io/serviceaccount/token}
 
-# set up configuration for openshift client and azure
-if [ -n "${WRITE_KUBECONFIG}" ]; then
-    MASTER_URL=${MASTER_URL:-https://kubernetes.default.svc.cluster.local:443}
-    MASTER_CA=${MASTER_CA:-/var/run/secrets/kubernetes.io/serviceaccount/ca.crt}
-    TOKEN_FILE=${TOKEN_FILE:-/var/run/secrets/kubernetes.io/serviceaccount/token}
+# craft a kubeconfig, usually at $KUBECONFIG location
+oc config set-cluster master \
+    --api-version='v1' \
+    --certificate-authority="${MASTER_CA}" \
+    --server="${MASTER_URL}"
 
-    # craft a kubeconfig, usually at $KUBECONFIG location
-    oc config set-cluster master \
-        --api-version='v1' \
-        --certificate-authority="${MASTER_CA}" \
-        --server="${MASTER_URL}"
+oc config set-credentials account \
+    --token="$(<${TOKEN_FILE})"
 
-    oc config set-credentials account \
-        --token="$(<${TOKEN_FILE})"
+oc config set-context current \
+    --cluster=master \
+    --user=account \
+    --namespace="${NAMESPACE}"
 
-    oc config set-context current \
-        --cluster=master \
-        --user=account \
-        --namespace="${NAMESPACE}"
+oc config use-context current
 
-    oc config use-context current
-fi
+NAMESPACE_UID=`oc get namespaces/uber -o jsonpath --template='{.metadata.uid}'`
 
 resources=()
 
@@ -136,31 +133,25 @@ for ps in ${petsets}; do
     resources[$i]=pod/${ps}-0
 done
 
-if [ ${resources[*]} -lt 1 ]; then
+if [ ${#resources[*]} -lt 1 ]; then
     echo "No suitable applications to dump from '${NAMESPACE}'. Giving up..."
     exit 0
 fi
 
-
 for res in ${resources[*]}; do
-    rm -vf ${DUMP_FILE} || true
+    [ -e "${DUMP_FILE}" ] && rm -vf ${DUMP_FILE} || true
 
     echo
     echo "--> Dumping from ${res}"
 
-	## Start lines with TAB to here-doc strip it prior expansion
-	oc rsh -t -n ${NAMESPACE} ${res} > ${DUMP_FILE} <<-EOF
-		[ -n "\${ENABLED_COLLECTIONS}" ] && source scl_source enable \${ENABLED_COLLECTIONS}
-		[ -d /var/lib/mysql ] && exec mysqldump -u root --all-databases
-		[ -d /var/lib/pgsql ] && exec pg_dumpall
-		[ -d /var/lib/mongodb ] && exec mongodump --username admin --password \${MONGODB_ADMIN_PASSWORD} --archive
-		exit 1
-	EOF
+    oc rsh -t -n ${NAMESPACE} ${res} > ${DUMP_FILE} <${CONTAINER_SCRIPTS_PATH}/dump-database
 
     if [ $? -eq 0 ]; then
         if [ -s ${DUMP_FILE} ]; then
+            ls -l ${DUMP_FILE}
             gzip "${DUMP_FILE}"
-            upload ${DUMP_FILE}.gz ${dc}
+            ls -l ${DUMP_FILE}.gz
+            upload ${DUMP_FILE}.gz ${res##*/}
             rm -f ${DUMP_FILE}.gz
         fi
     fi
