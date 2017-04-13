@@ -1,10 +1,9 @@
 FROM openshift/origin
 
-MAINTAINER Diego Castro <diego.castro@getupcloud.com>
+MAINTAINER Mateus Caruccio <mateus.caruccio@getupcloud.com>
 
 ENV HOME=/data \
     KUBECONFIG=/data/.kubeconfig \
-    WRITE_KUBECONFIG=1 \
     CONTAINER_SCRIPTS_PATH=/usr/share/container-scripts
 
 RUN mkdir -p ${HOME} && \
@@ -24,7 +23,7 @@ ADD root /
 
 #VOLUME ${HOME}
 
-USER 1000
+USER 1001
 
 ENTRYPOINT ["container-entrypoint"]
 CMD ["run"]

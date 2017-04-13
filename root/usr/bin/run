@@ -29,6 +29,7 @@ azure_upload()
         --blob "${2}"
 }
 
+
 aws_upload()
 {
     echo
@@ -38,6 +39,7 @@ aws_upload()
         "${1}" \
         "s3://${AWS_S3_BUCKET_NAME}/${2}"
 }
+
 
 upload()
 {
@@ -49,7 +51,6 @@ upload()
     send_to_azure && azure_upload "${local_file}" "${remote_path}"
     send_to_aws && aws_upload "${local_file}" "${remote_path}"
 }
-
 
 send_to_azure && is_azure=1 || is_azure=0
 send_to_aws && is_aws=1 || is_aws=0
@@ -82,11 +83,6 @@ export NAMESPACE_UID=`oc get namespaces/uber -o jsonpath --template='{.metadata.
 [ "${missconfig}" == "1" ] && exit 1
 [ "${DEBUG}" == 1 ] && set -x
 
-# TODO: move to image
-#if send_to_azure; then
-#    azure telemetry --disable
-#    azure config mode arm
-#fi
 
 TIMESTAMP=$(date +%Y-%m-%d-%H%M%S)
 DUMP_FILE=${HOME:-/data}/backup-${TIMESTAMP}
