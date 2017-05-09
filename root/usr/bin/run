@@ -107,7 +107,7 @@ oc config set-context current \
 
 oc config use-context current
 
-NAMESPACE_UID=`oc get namespaces/uber -o jsonpath --template='{.metadata.uid}'`
+NAMESPACE_UID=`oc get namespaces/$NAMESPACE -o jsonpath --template='{.metadata.uid}'`
 
 resources=()
 
