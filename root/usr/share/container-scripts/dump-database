@@ -16,7 +16,7 @@ fi
 [ -d /var/lib/pgsql ] && exec pg_dumpall
 
 if [ -d /var/lib/mongodb ]; then
-    if mongo --version | grep '2\.[0-9]'; then
+    if mongo --version | grep '2\.[0-9]' &>/dev/null; then
         dir=`mktemp -d`
         trap "rm -rf '${dir}'" EXIT
         cd ${dir}
@@ -25,7 +25,7 @@ if [ -d /var/lib/mongodb ]; then
         ret=$?
         rm -rf ./dump &>/dev/null
         exit $ret
-    elif mongo --version | grep '3\.[0-9]'; then
+    elif mongo --version | grep '3\.[0-9]' &>/dev/null; then
         exec mongodump --username admin --password "${MONGODB_ADMIN_PASSWORD}" --archive
     fi
 fi
