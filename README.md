@@ -1,11 +1,10 @@
 # OpenShift Database Backup Image
-Database Backup for Openshift Pods
 
-**Atention:**
+Database Backup of Openshift Pods
 
-This is a experimental image for backup MySQL, PostgreSQL and MongoDB, **use at your own risk!!**
+This is experimental code, **use at your own risk!!**
 
-##Versions:
+## Versions:
 MySQL versions currently supported are:
 * [mysql-5.5](http://dev.mysql.com/doc/refman/5.5/en/)
 * [mysql-5.6](http://dev.mysql.com/doc/refman/5.6/en/)
@@ -20,7 +19,7 @@ MongoDB versions currently supported are:
 * [mongodb-2.6](https://docs.mongodb.org/v2.6/)
 * [mongodb-2.6](https://docs.mongodb.org/v3.2/)
 
-##Instalation:
+## Instalation:
 You can either use our image from [dockerhub](https://hub.docker.com/r/getupcloud/backup) or build at your local machine:
 
 To use our image:
@@ -36,11 +35,11 @@ To build the image:
   $ docker build -t backup:latest .
   ```
   
-##Requirements:
+## Requirements:
 This image expects you have a Azure Storage Account, a blob container and the keys, for more information about Azure Blob Storage please see the official [documentation](https://azure.microsoft.com/en-us/documentation/articles/storage-create-storage-account/)
 
 
-##Usage:
+## Usage:
 
   ```
   $ ./backup.sh -n NAMESPACE -k <Azure Key> -c <Azure Container> -a <Azure Storage Account Name>
