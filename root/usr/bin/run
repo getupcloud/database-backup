@@ -2,6 +2,11 @@
 
 TIMESTAMP=$(date +%Y-%m-%d-%H%M%S)
 
+is_database()
+{
+    oc rsh -n $1 $2 <${CONTAINER_SCRIPTS_PATH}/check-database &>/dev/null
+}
+
 send_to_azure()
 {
    [ -n "${AZURE_ACCOUNT_KEY}" ] && \
@@ -21,37 +26,29 @@ send_to_aws()
 
 azure_upload()
 {
-    echo
-    echo "--> Uploading to Azure Blob Storage: ${AZURE_CONTAINER}/${2}"
-    azure storage blob upload \
-        --account-key "${AZURE_ACCOUNT_KEY}" \
-        --account-name "${AZURE_ACCOUNT_NAME}" \
-        --container "${AZURE_CONTAINER}" \
-        --file "${1}" \
-        --blob "${2}"
+    echo "--> Uploading to Azure Blob Storage: ${AZURE_CONTAINER}/$1"
+    ${CONTAINER_SCRIPTS_PATH}/upload-azure "${1}"
 }
 
 
 aws_upload()
 {
-    echo
-    echo "--> Uploading to S3: s3://$AWS_S3_BUCKET_NAME/$2"
-    aws s3 cp \
-        ${AWS_REGION:+--region "${AWS_REGION}"} \
-        "${1}" \
-        "s3://${AWS_S3_BUCKET_NAME}/${2}"
+    echo "--> Uploading to AWS S3: s3://$AWS_S3_BUCKET_NAME/$1"
+    ${CONTAINER_SCRIPTS_PATH}/upload-aws "${1}"
 }
 
 
 upload()
 {
-    local local_file=${1}
-    local app_name=${2}
-    local basename=${local_file##*/}
-    local remote_path="${NAMESPACE}/${NAMESPACE_UID}/${app_name}_${basename}"
+    local prefix=${1//\//-}
+    local extension=${2:-}
+    local remote_path="${NAMESPACE}/${NAMESPACE_UID}/${prefix}-${TIMESTAMP}${extension}"
 
-    send_to_azure && azure_upload "${local_file}" "${remote_path}"
-    send_to_aws && aws_upload "${local_file}" "${remote_path}"
+    if send_to_azure; then
+        azure_upload "${remote_path}"
+    elif send_to_aws; then
+        aws_upload "${remote_path}"
+    fi
 }
 
 send_to_azure && is_azure=1 || is_azure=0
@@ -59,7 +56,7 @@ send_to_aws && is_aws=1 || is_aws=0
 
 if [ $(( $is_azure | $is_aws )) -eq 0 ]; then
     cat <<-EOF
-	ERROR: Please select at least one storage method by settings according env vars:
+	ERROR: Please select one storage method by settings according env vars:
 	ERROR:
 	ERROR:  - Azure Blob Storage
 	ERROR:      AZURE_ACCOUNT_NAME
@@ -84,16 +81,14 @@ fi
 [ "${DEBUG}" == 1 ] && set -x
 unset DEBUG
 
-DUMP_FILE=${HOME:-/data}/${TIMESTAMP}
-
 # set up configuration for openshift client
 MASTER_URL=${MASTER_URL:-https://kubernetes.default.svc.cluster.local:443}
 MASTER_CA=${MASTER_CA:-/var/run/secrets/kubernetes.io/serviceaccount/ca.crt}
 TOKEN_FILE=${TOKEN_FILE:-/var/run/secrets/kubernetes.io/serviceaccount/token}
 
+{
 # craft a kubeconfig, usually at $KUBECONFIG location
 oc config set-cluster master \
-    --api-version='v1' \
     --certificate-authority="${MASTER_CA}" \
     --server="${MASTER_URL}"
 
@@ -106,6 +101,7 @@ oc config set-context current \
     --namespace="${NAMESPACE}"
 
 oc config use-context current
+} >/dev/null
 
 NAMESPACE_UID=`oc get namespaces/$NAMESPACE -o jsonpath --template='{.metadata.uid}'`
 
@@ -134,25 +130,23 @@ for ps in ${petsets}; do
 done
 
 if [ ${#resources[*]} -lt 1 ]; then
-    echo "No suitable applications to dump from '${NAMESPACE}'. Giving up..."
+    echo "--> No suitable applications to dump from '${NAMESPACE}'. Giving up..."
     exit 0
 fi
 
 for res in ${resources[*]}; do
-    [ -e "${DUMP_FILE}" ] && rm -vf ${DUMP_FILE} || true
+    if ! is_database ${NAMESPACE} ${res}; then
+        continue
+    fi
 
-    echo
     echo "--> Dumping from ${res}"
 
-    oc rsh -t -n ${NAMESPACE} ${res} > ${DUMP_FILE} <${CONTAINER_SCRIPTS_PATH}/dump-database
+    oc rsh -n ${NAMESPACE} ${res} <${CONTAINER_SCRIPTS_PATH}/dump-database | ${CONTAINER_SCRIPTS_PATH}/pipecount | gzip -c - | upload ${res} .gz
+    ret=$?
 
-    if [ $? -eq 0 ]; then
-        if [ -s ${DUMP_FILE} ]; then
-            ls -l ${DUMP_FILE}
-            gzip "${DUMP_FILE}"
-            ls -l ${DUMP_FILE}.gz
-            upload ${DUMP_FILE}.gz ${res##*/}
-            rm -f ${DUMP_FILE}.gz
-        fi
+    if [ $ret -eq 1 ]; then
+        echo "ERROR: Fail generating backup: $res"
+    elif [ $ret -eq 2 ]; then
+        echo "ERROR: Fail uploading backup: $res"
     fi
 done

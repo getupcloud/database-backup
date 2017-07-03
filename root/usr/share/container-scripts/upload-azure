@@ -1,0 +1,47 @@
+#!/usr/bin/env python3
+
+from __future__ import print_function
+import sys
+import os
+import uuid
+
+assert len(sys.argv) > 1
+stdin = os.fdopen(sys.stdin.fileno(), 'rb', 0)
+
+try:
+    from azure.storage.blob import BlockBlobService
+
+    AZURE_CONTAINER = os.environ['AZURE_CONTAINER']
+    AZURE_ACCOUNT_KEY = os.environ['AZURE_ACCOUNT_KEY']
+    AZURE_ACCOUNT_NAME = os.environ['AZURE_ACCOUNT_NAME']
+    AZURE_BLOB_NAME = sys.argv[1]
+
+    blob_svc = BlockBlobService(
+            account_name=AZURE_ACCOUNT_NAME,
+            account_key=AZURE_ACCOUNT_KEY)
+
+    blob_svc.create_container(AZURE_CONTAINER)
+
+    blob_svc.create_blob_from_stream(
+            container_name=AZURE_CONTAINER,
+            blob_name=AZURE_BLOB_NAME,
+            stream=stdin,
+            max_connections=1) # stream cant be seek()ed
+
+    try:
+        stdin.close()
+    except:
+        pass
+
+    blob = blob_svc.get_blob_properties(
+            container_name=AZURE_CONTAINER,
+            blob_name=AZURE_BLOB_NAME)
+
+    total_bytes = blob.properties.content_length
+    print('--> Sent', total_bytes, 'bytes')
+    sys.exit(1 if total_bytes == 0 else 0)
+except Exception as ex:
+    print('ERROR: upload-azure {}: {}'.format(ex.__class__.__name__, ex), file=sys.stderr)
+    import traceback
+    traceback.print_exc()
+    sys.exit(2)
