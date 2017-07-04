@@ -6,22 +6,17 @@ ENV HOME=/data \
     KUBECONFIG=/data/.kubeconfig \
     CONTAINER_SCRIPTS_PATH=/usr/share/container-scripts
 
-RUN mkdir -p ${HOME} && \
+RUN set -x && \
+    mkdir -p ${HOME} && \
     chmod 777 ${HOME} && \
-    INSTALL_PKGS="nodejs npm telnet python2-pip" && \
-    yum install -y epel-release && \
+    yum install -y --setopt=tsflags=nodocs epel-release && \
+    INSTALL_PKGS="gcc python34-pip python34-devel openssl-devel pv" && \
     yum install -y --setopt=tsflags=nodocs $INSTALL_PKGS && \
     yum clean all -y && \
-    npm install -g azure-cli && \
-    npm cache clean && \
-    azure telemetry --disable && \
-    azure config mode arm && \
-    pip install awscli && \
+    pip3 install --no-cache-dir azure-storage boto3 && \
     chmod 777 ${HOME} -R
 
 ADD root /
-
-#VOLUME ${HOME}
 
 USER 1001
 

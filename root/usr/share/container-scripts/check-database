@@ -1,0 +1,8 @@
+#!/bin/sh
+
+[ "${DEBUG}" == 1 ] && set -x
+
+[ -n "${ENABLED_COLLECTIONS}" ] && source scl_source enable ${ENABLED_COLLECTIONS}
+
+[ -d /var/lib/mysql ] || [ -d /var/lib/pgsql ] || [ -d /var/lib/mongodb ]
+
