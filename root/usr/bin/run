@@ -145,12 +145,15 @@ if [ ${#resources[*]} -lt 1 ]; then
     exit 0
 fi
 
+echo "--> Found resouces: ${resources[*]}"
+
 for res in ${resources[*]}; do
     if ! is_database ${NAMESPACE} ${res}; then
+        echo "--> Not a database: $NAMESPACE/${res}. Skipping..."
         continue
     fi
 
-    echo "--> Dumping from ${res}"
+    echo "--> Dumping from $NAMESPACE/${res}"
 
     oc rsh -n ${NAMESPACE} ${res} <${CONTAINER_SCRIPTS_PATH}/dump-database | ${CONTAINER_SCRIPTS_PATH}/pipecount | gzip -c - | upload ${res} .gz
     ret=$?
