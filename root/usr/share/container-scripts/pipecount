@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import os, sys
+import signal
 
 stdin = os.fdopen(sys.stdin.fileno(), 'rb')
 stdout = os.fdopen(sys.stdout.fileno(), 'wb')
