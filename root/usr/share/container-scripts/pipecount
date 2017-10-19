@@ -6,23 +6,28 @@ import signal
 stdin = os.fdopen(sys.stdin.fileno(), 'rb')
 stdout = os.fdopen(sys.stdout.fileno(), 'wb')
 total = 0
+freq = 10
 
 def progress(signum, frame):
     global total
-    print('Sent %i bytes' % total)
-    signal.alarm(30)
+    if total > -1:
+        sys.stderr.write('--> Recv %i bytes\n' % total)
+        sys.stderr.flush()
+        signal.alarm(freq)
 
 signal.signal(signal.SIGALRM, progress)
-signal.alarm(30)
+signal.alarm(freq)
 
 try:
     for data in stdin.read(8192):
         stdout.write(data)
         total = total + len(data)
 except Exception as ex:
-    print('pipecount: {}: {}'.format(ex.__class__.__name__, ex))
+    sys.stderr.write('pipecount: {}: {}\n'.format(ex.__class__.__name__, ex))
 
-signal.alarm(0)
+sys.stderr.write('--> Recv %i total bytes\n' % total)
+sys.stderr.flush()
+total = -1
 
 try:
     stdin.close()
@@ -34,6 +39,9 @@ try:
 except:
     pass
 
-sys.stderr.write('Sent %i total bytes' % total)
+try:
+    sys.stderr.close()
+except:
+    pass
 
 sys.exit(1 if total == 0 else 0)
