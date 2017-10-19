@@ -16,7 +16,7 @@ signal.signal(signal.SIGALRM, progress)
 signal.alarm(30)
 
 try:
-    for data in stdin.read():
+    for data in stdin.read(8192):
         stdout.write(data)
         total = total + len(data)
 except Exception as ex:
