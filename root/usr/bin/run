@@ -155,7 +155,7 @@ for res in ${resources[*]}; do
 
     echo "--> Dumping from $NAMESPACE/${res}"
 
-    oc rsh -n ${NAMESPACE} ${res} <${CONTAINER_SCRIPTS_PATH}/dump-database | ${CONTAINER_SCRIPTS_PATH}/pipecount | gzip -c - | upload ${res} .gz
+    oc rsh -n ${NAMESPACE} ${res} <${CONTAINER_SCRIPTS_PATH}/dump-database | gzip -c - | pv --interval 5 --format '%b %t %r' | upload ${res} .gz
     ret=$?
 
     if [ $ret -eq 1 ]; then
