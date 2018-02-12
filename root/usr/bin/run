@@ -107,7 +107,7 @@ NAMESPACE_UID=`oc get namespaces/$NAMESPACE -o jsonpath --template='{.metadata.u
 
 resources=()
 
-dcs=$(oc get dc -o jsonpath \
+dcs=$(oc get deploymentconfigi -o jsonpath \
     --template='{.items[*].metadata.name}' \
     -n ${NAMESPACE} \
     ${LABEL_SELECTOR:+-l ${LABEL_SELECTOR}}
