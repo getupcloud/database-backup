@@ -1,6 +1,6 @@
 REPO = getupcloud
-NAME = backup
-VERSION = v2.2
+NAME = database-backup
+VERSION = v2.3
 
 all: build
 
