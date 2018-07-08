@@ -1,0 +1,27 @@
+#!/usr/bin/env python3
+
+from __future__ import print_function
+import sys, os, json
+
+assert len(sys.argv) > 1
+
+try:
+    from google.cloud import storage
+
+    with open(os.environ['GOOGLE_APPLICATION_CREDENTIALS']) as credentials:
+        GOOGLE_PROJECT_ID = json.load(credentials)["project_id"]
+
+    GOOGLE_BUCKET_NAME = os.environ['GOOGLE_BUCKET_NAME']
+    GOOGLE_OBJECT_NAME = sys.argv[1]
+
+    client = storage.Client(project=GOOGLE_PROJECT_ID)
+    bucket = client.get_bucket(GOOGLE_BUCKET_NAME)
+    blob = storage.Blob(GOOGLE_OBJECT_NAME, bucket)
+
+    blob.upload_from_filename(GOOGLE_OBJECT_NAME)
+    sys.exit(0)
+except Exception as ex:
+    print('ERROR: upload-gce: {}: {}'.format(ex.__class__.__name__, ex), file=sys.stderr)
+    import traceback
+    traceback.print_exc()
+    sys.exit(2)
