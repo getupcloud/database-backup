@@ -7,7 +7,6 @@ ENV HOME=/usr/src/app \
     KUBECONFIG=/usr/src/app/.kubeconfig \
     CONTAINER_SCRIPTS_PATH=/usr/share/container-scripts
 
-ADD root /
 ADD requirements.txt /usr/src/app/
 
 RUN mkdir -p ${HOME} && \
@@ -19,7 +18,10 @@ RUN mkdir -p ${HOME} && \
     pip3 install --no-cache-dir -r /usr/src/app/requirements.txt && \
     chown 1001 -R ${HOME}
 
+ADD root /
+
 USER 1001
 
 ENTRYPOINT ["container-entrypoint"]
+
 CMD ["run"]

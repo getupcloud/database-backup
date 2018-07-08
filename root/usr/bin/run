@@ -1,5 +1,11 @@
 #!/bin/bash
 
+COLOR_GREEN="\e[32m"
+COLOR_CYAN="\e[96m"
+COLOR_GRAY="\e[90m"
+COLOR_RED="\e[31m"
+COLOR_RESET="\e[0;0m"
+
 [ "${DEBUG}" == 1 ] && set -x
 unset DEBUG
 
@@ -34,25 +40,26 @@ send_to_gce()
 
 azure_upload()
 {
-    echo "--> Uploading to Azure Blob Storage: ${AZURE_CONTAINER}/$1"
+    echo -e "${COLOR_CYAN}--> Uploading to Azure Blob Storage: ${AZURE_CONTAINER}/$1${COLOR_RESET}"
     ${CONTAINER_SCRIPTS_PATH}/upload-azure "${1}"
 }
 
 
 aws_upload()
 {
-    echo "--> Uploading to AWS S3: s3://$AWS_S3_BUCKET_NAME/$1"
+    echo -e "${COLOR_CYAN}--> Uploading to AWS S3: s3://$AWS_S3_BUCKET_NAME/$1"
     ${CONTAINER_SCRIPTS_PATH}/upload-aws "${1}"
 }
 
 gce_upload()
 {
-    echo "--> Uploading to GCE Bucket $GOOGLE_BUCKET_NAME/$1"
+    echo -e "${COLOR_CYAN}--> Uploading to GCE Bucket: $GOOGLE_BUCKET_NAME/$1$"
     trap "rm -vf ${1}" EXIT
-    echo "--> Creating temporary file $1"
+    echo -e "--> Creating temporary file $1$"
     mkdir -p "${1%/*}"
     cat > "${1}"
     ${CONTAINER_SCRIPTS_PATH}/upload-gce "${1}"
+    echo -ne "${COLOR_RESET}"
 }
 
 
@@ -62,7 +69,7 @@ upload()
     local prefix=${2//\//-}
     local extension=${3:-}
     local namespace_uid=$(oc get namespaces/$namespace -o template --template='{{.metadata.uid}}')
-    local remote_path="${namespace,,}/${namespace_uid^^}/${prefix,,}-${TIMESTAMP^^}${extension,,}"
+    local remote_path="database/${namespace,,}/${namespace_uid^^}/${prefix,,}-${TIMESTAMP^^}${extension,,}"
 
     if send_to_azure; then
         azure_upload "${remote_path}"
@@ -76,6 +83,7 @@ upload()
 send_to_azure || send_to_aws || send_to_gce || has_valid_config=0 && has_valid_config=1
 
 if [ $has_valid_config -ne 1 ]; then
+    echo -ne "${COLOR_RED}"
     cat <<-EOF
 	ERROR: Please select one storage method by settings according env vars:
 	ERROR:
@@ -94,9 +102,9 @@ if [ $has_valid_config -ne 1 ]; then
 	ERROR:      GOOGLE_APPLICATION_CREDENTIALS
 	ERROR:      GOOGLE_BUCKET_NAME
 	EOF
+    echo -e "${COLOR_RESET}"
     exit 1
 fi
-
 
 # set up configuration for openshift client
 MASTER_URL=${MASTER_URL:-https://kubernetes.default.svc.cluster.local:443}
@@ -135,22 +143,22 @@ resources=(
 )
 
 if [ ${#resources[*]} -lt 1 ]; then
-    echo "--> No suitable applications to dump."
+    echo -e "${COLOR_RED}--> No suitable applications to dump.${COLOR_RESET}"
     exit 0
 fi
 
-echo  "--> Found ${#resources[*]} resources"
+echo -e "${COLOR_GREEN}--> Found ${#resources[*]} resources${COLOR_RESET}"
 
 for resource in ${resources[*]}; do
     ns=${resource%%/*}
     resource=${resource#*/}
 
     if ! is_database ${ns} ${resource}; then
-        echo "--> Ignoring non-database $resource from namespace $ns"
+        echo -e "${COLOR_GRAY}--> Ignoring non-database $resource from namespace $ns${COLOR_RESET}"
         continue
     fi
 
-    echo "--> Dumping ${resource} from namespace $ns"
+    echo -e "${COLOR_GREEN}--> Dumping ${resource} from namespace $ns"
 
     oc rsh -n ${ns} ${resource} <${CONTAINER_SCRIPTS_PATH}/dump-database |
         gzip -c - |
@@ -158,10 +166,13 @@ for resource in ${resources[*]}; do
         upload $ns ${resource} .gz
 
     ret=$?
+    echo -ne "${COLOR_RESET}"
 
     if [ $ret -eq 1 ]; then
-        echo "ERROR: Fail generating backup for $resource from namespace $ns"
+        echo -e "${COLOR_RED}ERROR: Fail generating backup for $resource from namespace $ns${COLOR_RESET}"
     elif [ $ret -eq 2 ]; then
-        echo "ERROR: Fail uploading backup for $resource from namespace $ns"
+        echo -e "${COLOR_RED}ERROR: Fail uploading backup for $resource from namespace $ns${COLOR_RESET}"
     fi
 done
+
+echo -e "${COLOR_GREEN}--> Finished${COLOR_RESET}"
