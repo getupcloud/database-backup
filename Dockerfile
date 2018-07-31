@@ -24,4 +24,6 @@ USER 1001
 
 ENTRYPOINT ["container-entrypoint"]
 
+WORKDIR $HOME
+
 CMD ["run"]
