@@ -53,7 +53,7 @@ aws_upload()
 
 gce_upload()
 {
-    echo -e "${COLOR_CYAN}--> Uploading to GCE Bucket: $GOOGLE_BUCKET_NAME/$1$"
+    echo -e "${COLOR_CYAN}--> Uploading to GCE Bucket: $GOOGLE_BUCKET_NAME/$1"
     trap "rm -vf ${1}" EXIT
     echo -e "--> Creating temporary file $1$"
     mkdir -p "${1%/*}"
