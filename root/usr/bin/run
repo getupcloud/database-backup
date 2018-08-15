@@ -59,7 +59,9 @@ gce_upload()
     mkdir -p "${1%/*}"
     cat > "${1}"
     ${CONTAINER_SCRIPTS_PATH}/upload-gce "${1}"
+    local ret=$?
     echo -ne "${COLOR_RESET}"
+    return $ret
 }
 
 
@@ -80,7 +82,65 @@ upload()
     fi
 }
 
-send_to_azure || send_to_aws || send_to_gce || has_valid_config=0 && has_valid_config=1
+function gen_event()
+{
+    echo "Generating event: $@"
+    local \
+        sourceComponent=$1\
+        reason=$2 \
+        involvedObjectNamespace=$3 \
+        involvedObjectName=$4 \
+        involvedObjectKind=$5 \
+        count=1 \
+        date=$(date --iso-8601=seconds -u | sed -e 's/+0000$/Z/')
+
+    if [ "$reason" == Success ]; then
+        local type=Normal
+        local message="Database backup sucessfully created"
+    else
+        local type=Warning
+        case "$reason" in
+            InvalidConfig) local message="Invalid database backup backend config" ;;
+            FailedBackupDump) local message="Error dumping database backup" ;;
+            FailedBackupUpload) local message="Error uploading database backup" ;;
+            *) local message="Error creating database backup"
+        esac
+    fi
+
+    curl https://${KUBERNETES_SERVICE_HOST:-kubernetes.default.svc}:${KUBERNETES_SERVICE_PORT_HTTPS:-443}/api/v1/namespaces/$involvedObjectNamespace/events/ \
+        --cacert /run/secrets/kubernetes.io/serviceaccount/ca.crt \
+        -H "Authorization: Bearer $(</run/secrets/kubernetes.io/serviceaccount/token)" \
+        -H "Content-Type: application/json" \
+        -d @- <<EOF
+{
+    "apiVersion": "v1",
+    "kind": "Event",
+    "metadata": {
+      "name": "$sourceComponent.$RANDOM$RANDOM",
+      "namespace": "$involvedObjectNamespace"
+    },
+    "type": "$type",
+    "count": $count,
+    "message": "$message",
+    "firstTimestamp": "$date",
+    "lastTimestamp": "$date",
+    "reason": "$reason",
+    "involvedObject": {
+      "kind": "$involvedObjectKind",
+      "namespace": "$involvedObjectNamespace",
+      "name": "$involvedObjectName"
+    },
+    "reportingComponent": "backup.getup.io/database",
+    "reportingInstance": "$HOSTNAME",
+    "source": {
+      "component": "$sourceComponent",
+      "host": "$HOSTNAME"
+    }
+}
+EOF
+}
+has_valid_config=1
+send_to_azure || send_to_aws || send_to_gce || has_valid_config=0
 
 if [ $has_valid_config -ne 1 ]; then
     echo -ne "${COLOR_RED}"
@@ -103,6 +163,7 @@ if [ $has_valid_config -ne 1 ]; then
 	ERROR:      GOOGLE_BUCKET_NAME
 	EOF
     echo -e "${COLOR_RESET}"
+    gen_event database-backup InvalidConfig $NAMESPACE
     exit 1
 fi
 
@@ -124,22 +185,20 @@ TOKEN_FILE=${TOKEN_FILE:-/var/run/secrets/kubernetes.io/serviceaccount/token}
 
 } >/dev/null
 
+function get_res()
+{
+    local template="{{range .items}}{{.metadata.namespace}}/{{.kind}}/{{.metadata.name}} {{end}}"
+    local labelSelector="${LABEL_SELECTOR:+-l ${LABEL_SELECTOR}}"
+
+    oc get $1 --all-namespaces -o template --template="${template}" $labelSelector || true
+}
+
 resources=(
-    $(oc get deployments --all-namespaces -o template \
-        --template="{{range .items}}{{.metadata.namespace}}/{{.kind}}/{{.metadata.name}} {{end}}" \
-        ${LABEL_SELECTOR:+-l ${LABEL_SELECTOR}} || true)
-    $(oc get deploymentconfigs --all-namespaces -o template \
-        --template="{{range .items}}{{.metadata.namespace}}/{{.kind}}/{{.metadata.name}} {{end}}" \
-        ${LABEL_SELECTOR:+-l ${LABEL_SELECTOR}} || true)
-    $(oc get statefulsets --all-namespaces -o template \
-        --template="{{range .items}}{{.metadata.namespace}}/{{.kind}}/{{.metadata.name}} {{end}}" \
-        ${LABEL_SELECTOR:+-l ${LABEL_SELECTOR}} || true)
-    $(oc get petsets --all-namespaces -o template \
-        --template="{{range .items}}{{.metadata.namespace}}/{{.kind}}/{{.metadata.name}} {{end}}" \
-        ${LABEL_SELECTOR:+-l ${LABEL_SELECTOR}} || true)
-    $(oc get daemonset --all-namespaces -o template \
-        --template="{{range .items}}{{.metadata.namespace}}/{{.kind}}/{{.metadata.name}} {{end}}" \
-        ${LABEL_SELECTOR:+-l ${LABEL_SELECTOR}} || true)
+    $(get_res deployments)
+    $(get_res deploymentconfigs)
+    $(get_res statefulsets)
+    $(get_res petsets)
+    $(get_res daemonset)
 )
 
 if [ ${#resources[*]} -lt 1 ]; then
@@ -152,6 +211,8 @@ echo -e "${COLOR_GREEN}--> Found ${#resources[*]} resources${COLOR_RESET}"
 for resource in ${resources[*]}; do
     ns=${resource%%/*}
     resource=${resource#*/}
+    name=${resource#*/}
+    kind=${resource%/*}
 
     if ! is_database ${ns} ${resource}; then
         echo -e "${COLOR_GRAY}--> Ignoring non-database $resource from namespace $ns${COLOR_RESET}"
@@ -168,10 +229,16 @@ for resource in ${resources[*]}; do
     ret=$?
     echo -ne "${COLOR_RESET}"
 
-    if [ $ret -eq 1 ]; then
+    if [ $ret -eq 0 ]; then
+        gen_event database-backup Success $ns $name $kind
+    elif [ $ret -eq 1 ]; then
         echo -e "${COLOR_RED}ERROR: Fail generating backup for $resource from namespace $ns${COLOR_RESET}"
+        gen_event database-backup FailedBackupDump $ns $name $kind
     elif [ $ret -eq 2 ]; then
         echo -e "${COLOR_RED}ERROR: Fail uploading backup for $resource from namespace $ns${COLOR_RESET}"
+        gen_event database-backup FailedBackupUpload $ns $name $kind
+    else
+        gen_event database-backup FailedBackupUnknown $ns $name $kind
     fi
 done
 
