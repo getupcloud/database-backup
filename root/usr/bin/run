@@ -92,7 +92,8 @@ function gen_event()
         involvedObjectName=$4 \
         involvedObjectKind=$5 \
         count=1 \
-        date=$(date --iso-8601=seconds -u | sed -e 's/+0000$/Z/')
+        date=$(date --iso-8601=seconds -u | sed -e 's/[+-]....$/Z/') \
+        eventId=$(($(date +'%s * 1000 + %-N / 1000000'))) # milliseconds since epoch
 
     if [ "$reason" == Success ]; then
         local type=Normal
@@ -116,7 +117,7 @@ function gen_event()
     "apiVersion": "v1",
     "kind": "Event",
     "metadata": {
-      "name": "$sourceComponent.$RANDOM$RANDOM",
+      "name": "$sourceComponent.$eventId",
       "namespace": "$involvedObjectNamespace"
     },
     "type": "$type",
