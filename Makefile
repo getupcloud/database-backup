@@ -11,7 +11,7 @@ build:
 	docker build -t ${REPO}/${NAME}:${VERSION} .
 
 .PHONY: tag-latest
-tag-latest:
+tag:
 	docker tag ${REPO}/${NAME}:${VERSION} ${REPO}/${NAME}:latest
 
 .PHONY: push
