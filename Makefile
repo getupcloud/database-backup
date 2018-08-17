@@ -10,7 +10,7 @@ default: build
 build:
 	docker build -t ${REPO}/${NAME}:${VERSION} .
 
-.PHONY: tag-latest
+.PHONY: tag
 tag:
 	docker tag ${REPO}/${NAME}:${VERSION} ${REPO}/${NAME}:latest
 
