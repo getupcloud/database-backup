@@ -127,7 +127,7 @@ function gen_event()
     "lastTimestamp": "$date",
     "reason": "$reason",
     "involvedObject": {
-      "kind": "$involvedObjectKind",
+      "kind": "DatabaseBackup",
       "namespace": "$involvedObjectNamespace",
       "name": "$involvedObjectName"
     },
@@ -135,7 +135,7 @@ function gen_event()
     "reportingInstance": "$HOSTNAME",
     "source": {
       "component": "$sourceComponent",
-      "host": "$HOSTNAME"
+      "host": "$sourceComponent"
     }
 }
 EOF
